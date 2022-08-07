@@ -1,4 +1,5 @@
 CMakeLists.txt
 adr.txt
 script.sh
+.idea
 /cmake-build-debug
