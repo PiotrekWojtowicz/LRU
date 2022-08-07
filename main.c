@@ -1,7 +1,4 @@
 /*
- * To jest pierwszy i kurwa ostatni raz kiedy ja pisze algorytmy w C
- * moge wam wyrecytowac wirtualna alokacje zmiennych na pamiec
- *
  * Piotr Wojtowicz | Jagiellonian University | Cracow
  * This is an implementation of a popular
  * LRC algorithm which is a page-replacement
@@ -28,7 +25,7 @@
  * We will assume our system is capable of dealing
  * with just 5 addresses at the time
  * (in short, we have only 5 frames in our VM).
- * We will also assume our program will need only
+ * We will also assume our program will need an only
  * couple of addresses (no more than 15-20 - it's just
  * an exercise). These assumptions allow us to examine the
  * amount of page-fault exceptions.
@@ -103,7 +100,7 @@ typedef struct Node{
 }Node;
 
 Node *head = NULL;
-Node *tail = &head;
+Node *tail = NULL;
 
 /*
  * I will implement only the most
@@ -117,6 +114,8 @@ void Insert_top(VirtualMem vm_address){
         head = tail = Alloc_mem(1, sizeof(Node));
         head->virtual_address.virtual_page_number = vm_address.virtual_page_number;
         head->virtual_address.virtual_page_offset = vm_address.virtual_page_offset;
+        head->next = tail; tail->next = head;
+        head->prev = tail; tail->prev = head;
         return;
     }
     //Allocate memory
@@ -131,17 +130,118 @@ void Insert_top(VirtualMem vm_address){
     head->prev = new_node;
     //Change the 'heads'
     head = new_node;
+    tail->next = head;
 }
+
 /*
  * Linear time complexity
+ * I don't use the hashmap
  */
-int List_search(){
-    /* To be continued */
-    return 0;
+Node* List_search(VirtualMem vm_data){
+
+    Node *temp_ptr = head;
+    if(head == NULL){
+        Insert_top(vm_data);
+        return head;
+    }
+
+    while(temp_ptr!=tail){
+        if(temp_ptr->virtual_address.virtual_page_number == vm_data.virtual_page_number)
+            return temp_ptr;
+
+        temp_ptr = temp_ptr->next;
+    }
+    //check the tail
+    return (temp_ptr->virtual_address.virtual_page_number == vm_data.virtual_page_number) ? temp_ptr : NULL;
 }
 
-void Renew_item(Node *item){
+void Display_frames(Node* head_ptr){
+    char tmp_text[29];
+    int counter = 1;
+    do{
+        sprintf(tmp_text, "\nFRAME %2d | VPN: %2d | VPO: %2d",
+                counter,
+                head_ptr->virtual_address.virtual_page_number,
+                head_ptr->virtual_address.virtual_page_offset);
 
+        if(write(STDOUT_FILENO, tmp_text, sizeof(tmp_text)) == -1) {
+            perror("Write error");
+            exit(EXIT_FAILURE);
+        }
+        counter++;
+        head_ptr = head_ptr->next;
+    }while(head_ptr != head);
+
+    if(write(STDOUT_FILENO, "\n=================\n", (sizeof("\n=================\n")-1))==-1){
+        perror("Write error");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void Renew_item(VirtualMem vm_data, int *is_full){
+    /*
+     * Look for item
+     */
+    Node* list_node;
+    Node* temp_ptr;
+    /*
+     * First addition
+     */
+
+    //If not found, insert node
+    if((list_node = List_search(vm_data)) == NULL){
+        if(*is_full > 5){
+            temp_ptr = tail;
+            tail->prev->next = head;
+            head->prev = tail->prev;
+            tail = tail->prev;
+            /*
+             *We have to free the memory
+             */
+                free(temp_ptr);
+                temp_ptr = NULL;
+        }
+        Insert_top(vm_data);
+    }
+    else{ // If found, put on the top
+        if(list_node == head)
+            return;
+        else{
+            list_node->next->prev = list_node->prev;
+            list_node->prev->next = list_node->next;
+            if(list_node == tail)
+                tail = list_node->prev;
+            list_node->next = head;
+            head->prev = list_node;
+            list_node->prev = tail;
+            head = list_node;
+            tail->next = head;
+            (*is_full) -= (*(is_full) > 5 ? 0 : 1);
+        }
+    }
+}
+
+/*
+ * LRU Algorithm
+ * Recursive method
+ */
+void LRU(VirtualMem* vm_data){
+    if(vm_data == NULL)
+        return;
+    static int count = 0;
+    if(count < 5){
+        Renew_item(*vm_data, &count);
+        count++;
+        LRU((++vm_data));
+    }
+    Display_frames(head);
+    /*
+     * Check if we need to put
+     * vm address on top, and do it
+     * if so
+     */
+    Renew_item(*vm_data, &count);
+    LRU((++vm_data));
 }
 
 
@@ -171,10 +271,33 @@ void Read_from_file(void* data_ptr, size_t data_size, int file_desc){
     }
 }
 /*
+ * I/O Redirection to the log file
+ */
+int Log_file(char name[]){
+    int log_file_desc;
+    if((log_file_desc = open(name, O_CREAT | O_WRONLY, S_IRWXU)) == -1){
+        perror("Could not open the file");
+        exit(EXIT_FAILURE);
+    }
+    /*
+     * Dup the descriptors
+     */
+    if(dup2(log_file_desc, STDOUT_FILENO) == -1){
+        perror("Cannot duplicate the descriptor");
+        _exit(EXIT_FAILURE);
+    }
+    return log_file_desc;
+}
+//00480080004E00FC01FC0411004A014403EE098701FF001102EA0AD10C14013F
+/*
  * Display the memory
  */
 void Display_the_memory(void *data_ptr, size_t data_size){
-    void *temp_data_ptr = data_ptr;
+    if(write(STDOUT_FILENO, "Virtual addresses loaded: \n", (sizeof("Virtual addresses loaded: \n")-1)) == -1){
+        perror("Could not write to STDOUT");
+        exit(EXIT_FAILURE);
+    }
+    void *temp_data_ptr = (char*)data_ptr;
     for(int i = 1; i <= (data_size/ADDR_LENGTH); i++){
         if(write(STDOUT_FILENO, temp_data_ptr, ADDR_LENGTH) == -1){
             perror("Could not write to STDOUT");
@@ -195,13 +318,17 @@ void Display_the_memory(void *data_ptr, size_t data_size){
         }
         temp_data_ptr+=ADDR_LENGTH;
     }
+    if(write(STDOUT_FILENO, "\n", 1) == -1){
+        perror("Could not write to STDOUT");
+        exit(EXIT_FAILURE);
+    }
 }
 /*
  * Retrieve the virtual page number from virtual address
  * and fill the vm_array
  */
 void Fill_vm_array(void* data_ptr, VirtualMem *vm_ptr, size_t data_size){
-    void *temp_data_ptr = data_ptr;
+    void *temp_data_ptr = (char*)data_ptr;
     VirtualMem *temp_vm_ptr = vm_ptr;
 
     char temp_str_holder[ADDR_LENGTH];
@@ -226,7 +353,7 @@ void Fill_vm_array(void* data_ptr, VirtualMem *vm_ptr, size_t data_size){
          */
         temp_vm_ptr->virtual_page_offset = (temp_number<<28)>>28;
 
-        temp_vm_ptr += VM_STRUCT_SIZE;
+        temp_vm_ptr++;
         temp_data_ptr += ADDR_LENGTH;
     }
 }
@@ -238,12 +365,16 @@ int main(){
     /*
      * Allocate enough space for the data from the file
      */
-    void *data_ptr = Alloc_mem(my_stats.st_size, sizeof(int));
+    int *data_ptr = Alloc_mem(my_stats.st_size, sizeof(char));
     VirtualMem *vm_array = Alloc_mem((my_stats.st_size/ADDR_LENGTH), VM_STRUCT_SIZE);
     /*
      * Reading from the file
      */
     Read_from_file(data_ptr, my_stats.st_size, file_desc);
+    /*
+     * Dup the STDOUT
+     */
+    Log_file("./logs.txt");
     /*
      * Write the data array
      */
@@ -265,9 +396,8 @@ int main(){
      * We will choose the 2nd option and implement the stack as doubly linked list.
      */
 
-
-
-
+    VirtualMem *ptr = vm_array;
+    LRU(ptr);
     /*
      * Remember to free the data
      */
