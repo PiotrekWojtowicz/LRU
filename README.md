@@ -1,4 +1,4 @@
-# LRU algorihm
+# LRU algorithm
 This is an implementation of a popular
 <b>LRC</b> <i>(least recently used)</i> algorithm which is a page-replacement
 algorithm used in the virtual memory management system. 
