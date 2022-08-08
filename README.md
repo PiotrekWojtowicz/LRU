@@ -14,4 +14,4 @@ This is an implementation of a stack-algorithm version.
 
 ### Files
 
-Check the main.c where you can update the file names as well as its paths.
+Check the main.c where you can update filenames as well as their paths.
