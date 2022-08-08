@@ -11,3 +11,7 @@ This is an implementation of a stack-algorithm version.
 - We can only keep 5 virtual addresses at the time
 - The memory is bte addressable
 - No TLB/Cache taken into account
+
+### Files
+
+Check the main.c where you can update the file names as well as its paths.

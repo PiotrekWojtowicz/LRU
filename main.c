@@ -8,7 +8,10 @@
  * the contiguous virtual address. We will extract
  * just parts that refer to the particular pages (we don't need
  * the offsets). We will also assume a 64-byte page size.
- *
+ */
+#define ADDRESES "../adr.txt"
+#define LOGS "./logs.txt"
+/*
  * Hence:
  *  Virtual address     Virtual page number
  *  0x048                0x1
@@ -383,7 +386,7 @@ void Fill_vm_array(void* data_ptr, VirtualMem *vm_ptr, size_t data_size){
 int main(){
 
     int file_desc, log_file_desc;
-    struct stat my_stats = Open_file("../adr.txt", &file_desc);
+    struct stat my_stats = Open_file(ADDRESES, &file_desc);
     /*
      * Allocate enough space for the data from the file
      */
@@ -396,7 +399,7 @@ int main(){
     /*
      * Dup the STDOUT
      */
-    log_file_desc = Log_file("./logs.txt");
+    log_file_desc = Log_file(LOGS);
     /*
      * Write the data array
      */
