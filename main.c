@@ -1,13 +1,13 @@
 /*
  * Piotr Wojtowicz | Jagiellonian University | Cracow
  * This is an implementation of a popular
- * LRC algorithm which is a page-replacement
+ * LRU algorithm which is a page-replacement
  * algorithm used in the virtual memory management system.
  *
  * We are going to fetch the data from a file that contains
- * the contiguous virtual address frames. We will extract
- * just part that refers to the particular page (we don't need
- * the offset). We will also assume a 64-byte page size.
+ * the contiguous virtual address. We will extract
+ * just parts that refer to the particular pages (we don't need
+ * the offsets). We will also assume a 64-byte page size.
  *
  * Hence:
  *  Virtual address     Virtual page number
@@ -155,6 +155,21 @@ Node* List_search(VirtualMem vm_data){
     return (temp_ptr->virtual_address.virtual_page_number == vm_data.virtual_page_number) ? temp_ptr : NULL;
 }
 
+/*
+ * Delete nodes
+ */
+void Free_list(Node* list_head){
+    //If list is empty
+    if(head == NULL)
+        return;
+    Node *tmp_ptr = list_head->next;
+    do{
+        free(list_head);
+        list_head = tmp_ptr;
+        tmp_ptr = tmp_ptr->next;
+    } while (list_head != head);
+}
+
 void Display_frames(Node* head_ptr){
     char tmp_text[29];
     int counter = 1;
@@ -187,10 +202,9 @@ void Renew_item(VirtualMem vm_data, int *is_full){
     /*
      * First addition
      */
-
     //If not found, insert node
     if((list_node = List_search(vm_data)) == NULL){
-        if(*is_full > 5){
+        if(*is_full >= 5){
             temp_ptr = tail;
             tail->prev->next = head;
             head->prev = tail->prev;
@@ -216,34 +230,40 @@ void Renew_item(VirtualMem vm_data, int *is_full){
             list_node->prev = tail;
             head = list_node;
             tail->next = head;
-            (*is_full) -= (*(is_full) > 5 ? 0 : 1);
+            (*is_full) -= ((*is_full) >= 5 ? 0 : 1);
         }
     }
+    list_node = NULL;
+    temp_ptr = NULL;
+    Display_frames(head);
 }
 
 /*
  * LRU Algorithm
- * Recursive method
  */
 void LRU(VirtualMem* vm_data){
-    if(vm_data == NULL)
-        return;
     static int count = 0;
-    if(count < 5){
-        Renew_item(*vm_data, &count);
-        count++;
-        LRU((++vm_data));
+    //Check if end of proper data
+    //0xFFFF is not possible as the page
+    //size is equal to 64 bytes, and data
+    //is 'byteaddressable'
+    while(vm_data->virtual_page_offset != 0xFFFF) {
+        if (count < 5) {
+            Renew_item(*vm_data, &count);
+            count++;
+            ++vm_data;
+        }
+        else{
+            /*
+             * Check if we need to put
+             * vm address on top, and do it
+             * if so
+             */
+            Renew_item(*vm_data, &count);
+            ++vm_data;
+        }
     }
-    Display_frames(head);
-    /*
-     * Check if we need to put
-     * vm address on top, and do it
-     * if so
-     */
-    Renew_item(*vm_data, &count);
-    LRU((++vm_data));
 }
-
 
 /*
  * Open the file and fill the stat struct
@@ -288,7 +308,6 @@ int Log_file(char name[]){
     }
     return log_file_desc;
 }
-//00480080004E00FC01FC0411004A014403EE098701FF001102EA0AD10C14013F
 /*
  * Display the memory
  */
@@ -351,16 +370,19 @@ void Fill_vm_array(void* data_ptr, VirtualMem *vm_ptr, size_t data_size){
          * We assume the 32-bit int here
          * which is a possible bug-point
          */
-        temp_vm_ptr->virtual_page_offset = (temp_number<<28)>>28;
+        temp_vm_ptr->virtual_page_offset = (temp_number<<26)>>26;
 
         temp_vm_ptr++;
         temp_data_ptr += ADDR_LENGTH;
     }
+    temp_vm_ptr->virtual_page_offset = 0xFFFF; //impossible value
+    temp_vm_ptr = NULL;
+    temp_data_ptr = NULL;
 }
 
 int main(){
 
-    int file_desc;
+    int file_desc, log_file_desc;
     struct stat my_stats = Open_file("../adr.txt", &file_desc);
     /*
      * Allocate enough space for the data from the file
@@ -374,7 +396,7 @@ int main(){
     /*
      * Dup the STDOUT
      */
-    Log_file("./logs.txt");
+    log_file_desc = Log_file("./logs.txt");
     /*
      * Write the data array
      */
@@ -399,8 +421,16 @@ int main(){
     VirtualMem *ptr = vm_array;
     LRU(ptr);
     /*
+     * Close files
+     */
+    if(close(file_desc) == -1)
+        perror("Could not close file");
+    if(close(log_file_desc) == -1)
+        perror("Could not close file");
+    /*
      * Remember to free the data
      */
+    Free_list(head);
     free(data_ptr);
     free(vm_array);
     return 0;
