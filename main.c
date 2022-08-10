@@ -169,12 +169,14 @@ void Free_list(Node* list_head){
     do{
         free(list_head);
         list_head = tmp_ptr;
+        if(list_head == head)
+            break;
         tmp_ptr = tmp_ptr->next;
     } while (list_head != head);
 }
 
 void Display_frames(Node* head_ptr){
-    char tmp_text[29];
+    char tmp_text[30];
     int counter = 1;
     do{
         sprintf(tmp_text, "\nFRAME %2d | VPN: %2d | VPO: %2d",
@@ -391,7 +393,8 @@ int main(){
      * Allocate enough space for the data from the file
      */
     int *data_ptr = Alloc_mem(my_stats.st_size, sizeof(char));
-    VirtualMem *vm_array = Alloc_mem((my_stats.st_size/ADDR_LENGTH), VM_STRUCT_SIZE);
+    //Length is +1 bc of the end block
+    VirtualMem *vm_array = Alloc_mem((my_stats.st_size/ADDR_LENGTH)+1, VM_STRUCT_SIZE);
     /*
      * Reading from the file
      */

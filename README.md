@@ -15,3 +15,12 @@ This is an implementation of a stack-algorithm version.
 ### Files
 
 Check the main.c where you can update filenames as well as their paths.
+
+### Valgrind
+
+The algorithm is 100% memory safe, does not trigger any error nor warnings. Tested with valgrind 3.19.0.
+
+- No memory leaks detected
+- No warnings occurred
+- No invalid memory reads/writes
+
