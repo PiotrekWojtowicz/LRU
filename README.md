@@ -14,6 +14,11 @@ This is an implementation of a stack-algorithm version.
 
 ### Files
 
+Default<br>
+**adr.txt** -> contains virtual addresses <br>
+**logs.txt** -> well, logs
+
+
 Check the main.c where you can update filenames as well as their paths.
 
 ### Valgrind
